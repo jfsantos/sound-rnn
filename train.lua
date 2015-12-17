@@ -38,14 +38,14 @@ if params.gpu_id >= 0 then
     if not ok then print('package cunn not found!') end
     if not ok2 then print('package cutorch not found!') end
     if ok and ok2 then
-        print('using CUDA on GPU ' .. opt.gpuid .. '...')
+        print('using CUDA on GPU ' .. params.gpu_id .. '...')
         cutorch.setDevice(params.gpu_id + 1) -- note +1 to make it 0 indexed! sigh lua
         cutorch.manualSeed(params.seed)
     else
         print('If cutorch and cunn are installed, your CUDA toolkit may be improperly configured.')
         print('Check your CUDA toolkit installation, rebuild cutorch and cunn, and try again.')
         print('Falling back on CPU mode')
-        opt.gpuid = -1 -- overwrite user setting
+        params.gpu_id = -1 -- overwrite user setting
     end
 end
 
@@ -58,13 +58,21 @@ local mod = model.new(
     params.num_layers,
     params.mdn_components,
     params.seq_length,
-    params.batch_size
+    params.batch_size,
+    params.gpu_id
 )
 
-if opt.gpu_id >= 0 then
+--[[ if params.gpu_id >= 0 then
+    print('Shipping model and clones to GPU')
     for k,v in pairs(mod.protos) do v:cuda() end
-    for k,v in pairs(mod.clones) do v:cuda() end
-end
+    for k,v in ipairs(mod.clones) do
+        print('Shipping clone ' .. k)
+        for kc, vc in v do
+            print('Shipping ' .. kc)
+            vc:cuda()
+        end
+    end
+end ]]--
 
 function feval(params_)
     if params_ ~= mod.params then
@@ -75,8 +83,8 @@ function feval(params_)
     local x, y = data.next_batch(input)
 
     if params.gpu_id >= 0 then
-      x:cuda()
-      y:cuda()
+      x = x:cuda()
+      y = y:cuda()
     end
 
     -- forward pass

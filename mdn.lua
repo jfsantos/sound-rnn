@@ -77,8 +77,16 @@ function MDN:__init(num_components)
     Parent.__init(self)
     self.num_components = num_components
     self.input_buffer = torch.Tensor()
-    self.grad_input = torch.Tensor()
+    self.gradInput = torch.Tensor()
     self.sample_buffer = torch.Tensor()
+end
+
+function MDN:cuda()
+    print('Shipping MDN to GPU')
+    Parent.cuda(self)
+    self.input_buffer = self.input_buffer:cuda()
+    self.gradInput = self.gradInput:cuda()
+    self.sample_buffer = self.sample_buffer:cuda()
 end
 
 function MDN:updateOutput(input, target)

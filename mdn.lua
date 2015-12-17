@@ -29,7 +29,7 @@ local function get_params(self, input)
     local Nc = self.num_components
 
     -- first num_components values are mixture weights
-    local weights = x.new(X:size(1), Nc)
+    local weights = x.new(x:size(1), Nc)
     weights:copy(x[{{}, {1, Nc}}])
     weights:exp():cdiv(weights:sum(2):expandAs(weights))
 

@@ -26,10 +26,28 @@ cmd:option('-print_every', 100, 'how many steps/minibatches between printing out
 cmd:option('-seed', 123, 'torch manual random number generator seed')
 cmd:option('-learning_rate_decay', 0.97, 'learning rate decay')
 cmd:option('-num_threads', 1, 'number of CPU threads to use')
+cmd:option('-gpu_id', -1, 'ID of the GPU to use (-1 for CPU)')
 local params = cmd:parse(arg)
 
 torch.manualSeed(params.seed)
 torch.setnumthreads(params.num_threads)
+
+if params.gpu_id >= 0 then
+    local ok, cunn = pcall(require, 'cunn')
+    local ok2, cutorch = pcall(require, 'cutorch')
+    if not ok then print('package cunn not found!') end
+    if not ok2 then print('package cutorch not found!') end
+    if ok and ok2 then
+        print('using CUDA on GPU ' .. opt.gpuid .. '...')
+        cutorch.setDevice(params.gpu_id + 1) -- note +1 to make it 0 indexed! sigh lua
+        cutorch.manualSeed(params.seed)
+    else
+        print('If cutorch and cunn are installed, your CUDA toolkit may be improperly configured.')
+        print('Check your CUDA toolkit installation, rebuild cutorch and cunn, and try again.')
+        print('Falling back on CPU mode')
+        opt.gpuid = -1 -- overwrite user setting
+    end
+end
 
 local raw_audio = data.load_file(params.audio)
 local input = data.preprocess(raw_audio, params)
@@ -43,6 +61,11 @@ local mod = model.new(
     params.batch_size
 )
 
+if opt.gpu_id >= 0 then
+    for k,v in pairs(mod.protos) do v:cuda() end
+    for k,v in pairs(mod.clones) do v:cuda() end
+end
+
 function feval(params_)
     if params_ ~= mod.params then
         mod.params:copy(params_)
@@ -50,6 +73,11 @@ function feval(params_)
     mod.grad_params:zero()
 
     local x, y = data.next_batch(input)
+
+    if params.gpu_id >= 0 then
+      x:cuda()
+      y:cuda()
+    end
 
     -- forward pass
     local lstm_state = {[0] = mod.initstate}
@@ -99,9 +127,9 @@ end
 -- optimization
 print('starting optimisation')
 local losses = {}
-local optim_state = {learningRate = 0.001, alpha = 0.99}
+local optim_state = {learningRate = 0.001, alpha = 0.95}
 for i = 1, params.max_epochs * input.num_batches do
-    local _, loss = optim.adagrad(feval, mod.params, optim_state)
+    local _, loss = optim.rmsprop(feval, mod.params, optim_state)
 
     losses[#losses + 1] = loss[1]
 
@@ -117,7 +145,7 @@ for i = 1, params.max_epochs * input.num_batches do
 
     if i % params.print_every == 0 then
         print(string.format(
-            "iteration %4d, loss = %6.8f, gradnorm = %6.3e", i, loss[1], mod.grad_params:norm()
+            "iteration %4d, loss = %6.8f, gradnorm = %6.3e", i, loss[1], mod.grad_params:norm() / mod.params:norm()
         ))
     end
 

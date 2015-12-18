@@ -53,7 +53,7 @@ local function pdf(y, means, vars, weights, dims)
                      :prod(2)
                      :mul(math.pow(2 * math.pi, dims / 2))
     norm:add(eps)
-    
+
     return y:clone()
             :add(-means)
             :cdiv(vars)

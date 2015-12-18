@@ -48,10 +48,12 @@ local function get_params(self, input)
 end
 
 local function pdf(y, means, vars, weights, dims)
+    vars:add(eps)
     local norm = vars:clone()
                      :prod(2)
                      :mul(math.pow(2 * math.pi, dims / 2))
-
+    norm:add(eps)
+    
     return y:clone()
             :add(-means)
             :cdiv(vars)
@@ -91,6 +93,14 @@ function MDN:cuda()
     self.input_buffer = self.input_buffer:cuda()
     self.gradInput = self.gradInput:cuda()
     self.sample_buffer = self.sample_buffer:cuda()
+end
+
+function MDN:double()
+    print('Shipping MDN to CPU')
+    Parent.double(self)
+    self.input_buffer = self.input_buffer:double()
+    self.gradInput = self.gradInput:double()
+    self.sample_buffer = self.sample_buffer:double()
 end
 
 function MDN:updateOutput(input, target)
